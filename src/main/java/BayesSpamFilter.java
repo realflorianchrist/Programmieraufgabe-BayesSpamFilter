@@ -80,7 +80,6 @@ public class BayesSpamFilter {
             if (!word.isEmpty()) {
                 word = word.replaceAll("[^a-zA-Z]", "").toLowerCase()
                     .replaceAll("[^\\p{Alnum}]", "");
-                System.out.println(word);
                 int hamCount = hamWordCounts.getOrDefault(word, 0);
                 int spamCount = spamWordCounts.getOrDefault(word, 0);
 
