@@ -34,12 +34,6 @@ public class BayesSpamFilter {
 
         System.out.println("Es wurden " + String.format("%.2f", accuracy) + " % korrekt klassifiziert.");
 
-        /*
-        System.out.println(spamWordCounts);
-        System.out.println(spamWordCounts.size());
-        System.out.println(hamWordCounts.size());
-        */
-
     }
 
     // Methode zum Einlesen und Markieren der E-Mails
