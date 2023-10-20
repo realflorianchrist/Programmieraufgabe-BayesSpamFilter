@@ -27,7 +27,7 @@ public class BayesSpamFilter {
         spamFilter.train(hamAnlernPath, false);
         spamFilter.train(spamAnlernPath, true);
 
-        System.out.println("Bestimmter Alpha: " + alpha);
+        System.out.println("Bestimmtes Alpha: " + alpha);
         System.out.println("Bestimmter Schwellenwert: " + threshold);
 
         double accuracy = spamFilter.evaluateAccuracy(hamTestPath, spamTestPath);
@@ -91,7 +91,7 @@ public class BayesSpamFilter {
 
         // Spamwahrscheinlichkeit basierend auf dem Schwellenwert
         if (hamProbability + spamProbability == 0) {
-            return 0.5;
+            return threshold;
         } else {
             return spamProbability / (spamProbability + hamProbability);
         }
@@ -119,7 +119,7 @@ public class BayesSpamFilter {
                 try {
                     String emailContent = Files.readString(file, StandardCharsets.ISO_8859_1);
                     double spamProbability = calculateSpamProbability(emailContent);
-                    if (spamProbability < threshold) {
+                    if (spamProbability <= threshold) {
                         correctHam.getAndIncrement();
                     }
                 } catch (IOException e) {
@@ -143,7 +143,7 @@ public class BayesSpamFilter {
                 try {
                     String emailContent = Files.readString(file, StandardCharsets.ISO_8859_1);
                     double spamProbability = calculateSpamProbability(emailContent);
-                    if (spamProbability >= threshold) {
+                    if (spamProbability > threshold) {
                         correctSpam.getAndIncrement();
                     }
                 } catch (IOException e) {
