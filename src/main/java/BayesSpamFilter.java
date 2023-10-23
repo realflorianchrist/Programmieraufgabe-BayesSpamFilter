@@ -15,10 +15,14 @@ public class BayesSpamFilter {
     private static final String spamAnlernPath = "src/main/resources/data/spam-anlern";
     private static final String hamTestPath = "src/main/resources/data/ham-test";
     private static final String spamTestPath = "src/main/resources/data/spam-test";
-    private static final Map<String, Integer> hamWordCounts = new HashMap<>();
-    private static final Map<String, Integer> spamWordCounts = new HashMap<>();
-    private static double alpha = 0.9; // Kleiner Wert für unbekannte Wörter
-    private static double threshold = 0.8; // Schwellenwert für die Klassifikation
+    private static final Map<String, Double> hamWordCounts = new HashMap<>();
+    private static final Map<String, Double> spamWordCounts = new HashMap<>();
+    private static double alpha = 0.001; // Kleiner Wert für unbekannte Wörter
+    private static double threshold = 0.5; // Schwellenwert für die Klassifikation
+    private static int totalHam;
+    private static int totalSpam;
+    private static AtomicInteger correctHam;
+    private static AtomicInteger correctSpam;
 
     public static void main(String[] args) {
         BayesSpamFilter spamFilter = new BayesSpamFilter();
@@ -32,7 +36,10 @@ public class BayesSpamFilter {
 
         double accuracy = spamFilter.evaluateAccuracy(hamTestPath, spamTestPath);
 
-        System.out.println("Es wurden " + String.format("%.2f", accuracy) + " % korrekt klassifiziert.");
+        System.out.println("Es wurden " + correctHam + " von " + totalHam + " Ham-Mails korrekt klassifiziert.");
+        System.out.println("Es wurden " + correctSpam + " von " + totalSpam + " Spam-Mails korrekt klassifiziert.");
+
+        System.out.println("Insgesamt wurden " + String.format("%.2f", accuracy) + "% korrekt klassifiziert.");
 
     }
 
@@ -52,11 +59,13 @@ public class BayesSpamFilter {
 
                             for (String word : words) {
                                 word = word.toLowerCase();
-                                if (!word.isEmpty() && uniqueWords.add(word) && !word.matches(".*[=+/@].*") && word.length() >= 3 && word.length() < 15) {
+                                if (!word.isEmpty() && uniqueWords.add(word)
+                                    && !word.matches(".*[=+/@].*")
+                                    && word.length() >= 3 && word.length() < 15) {
                                     if (isSpam) {
-                                        spamWordCounts.put(word, spamWordCounts.getOrDefault(word, 0) + 1);
+                                        spamWordCounts.put(word, spamWordCounts.getOrDefault(word, 0.0) + 1);
                                     } else {
-                                        hamWordCounts.put(word, hamWordCounts.getOrDefault(word, 0) + 1);
+                                        hamWordCounts.put(word, hamWordCounts.getOrDefault(word, 0.0) + 1);
                                     }
                                 }
                             }
@@ -74,36 +83,46 @@ public class BayesSpamFilter {
     public double calculateSpamProbability(String emailContent) {
 
         String[] words = emailContent.split("[\\s]+");
-        double spamProbability = 1.0;
-        double hamProbability = 1.0;
+        //double spamProbability = 1.0;
+        //double hamProbability = 1.0;
+
+        double logSpamProbability = 0.0;
+        double logHamProbability = 0.0;
 
         for (String word : words) {
             if (!word.matches(".*[=+/@].*") && word.length() >= 3 && word.length() < 15) {
                 word = word.toLowerCase();
-                int hamCount = hamWordCounts.getOrDefault(word, 0);
-                int spamCount = spamWordCounts.getOrDefault(word, 0);
+                double hamCount = hamWordCounts.getOrDefault(word, alpha);
+                double spamCount = spamWordCounts.getOrDefault(word, alpha);
 
                 // Bayes'sche Formel, um die Wahrscheinlichkeiten zu aktualisieren
-                hamProbability *= (hamCount + alpha) / (hamWordCounts.size());
-                spamProbability *= (spamCount + alpha) / (spamWordCounts.size());
+//                hamProbability *= (hamCount) / (hamWordCounts.size());
+//                spamProbability *= (spamCount) / (spamWordCounts.size());
+
+                // Berechnung mit alternativer Formel
+                logHamProbability += Math.log((hamCount) / (hamWordCounts.size()));
+                logSpamProbability += Math.log((spamCount) / (spamWordCounts.size()));
             }
         }
 
         // Spamwahrscheinlichkeit basierend auf dem Schwellenwert
-        if (hamProbability + spamProbability == 0) {
-            return threshold;
-        } else {
-            return spamProbability / (spamProbability + hamProbability);
-        }
+//        if (hamProbability + spamProbability == 0) {
+//            return threshold;
+//        } else {
+//            return spamProbability / (spamProbability + hamProbability);
+//        }
+
+        // Berechnen der Spam-Wahrscheinlichkeit mit der Sigmoid-Funktion
+        return 1.0 / (1.0 + Math.exp(logHamProbability - logSpamProbability));
     }
 
     // Methode zur Bewertung der Genauigkeit
     public double evaluateAccuracy(String hamTestPath, String spamTestPath) {
-        AtomicInteger correctHam = testHamMails(hamTestPath);
-        AtomicInteger correctSpam = testSpamMails(spamTestPath);
+        correctHam = testHamMails(hamTestPath);
+        correctSpam = testSpamMails(spamTestPath);
 
-        int totalHam = countTotalMails(hamTestPath);
-        int totalSpam = countTotalMails(spamTestPath);
+        totalHam = countTotalMails(hamTestPath);
+        totalSpam = countTotalMails(spamTestPath);
 
         // Berechnen Sie die Genauigkeit
         return (double) (correctHam.get() + correctSpam.get()) / (totalHam + totalSpam) * 100;
@@ -119,7 +138,7 @@ public class BayesSpamFilter {
                 try {
                     String emailContent = Files.readString(file, StandardCharsets.ISO_8859_1);
                     double spamProbability = calculateSpamProbability(emailContent);
-                    if (spamProbability <= threshold) {
+                    if (spamProbability < threshold) {
                         correctHam.getAndIncrement();
                     }
                 } catch (IOException e) {
@@ -143,7 +162,7 @@ public class BayesSpamFilter {
                 try {
                     String emailContent = Files.readString(file, StandardCharsets.ISO_8859_1);
                     double spamProbability = calculateSpamProbability(emailContent);
-                    if (spamProbability > threshold) {
+                    if (spamProbability >= threshold) {
                         correctSpam.getAndIncrement();
                     }
                 } catch (IOException e) {
@@ -170,11 +189,11 @@ public class BayesSpamFilter {
         return totalMails;
     }
 
-    public static Map<String, Integer> getHamWordCounts() {
+    public static Map<String, Double> getHamWordCounts() {
         return hamWordCounts;
     }
 
-    public static Map<String, Integer> getSpamWordCounts() {
+    public static Map<String, Double> getSpamWordCounts() {
         return spamWordCounts;
     }
 }
